@@ -57,7 +57,7 @@ export default function VideoMeetComponent() {
     let [video, setVideo] = useState([]);
     let [audio, setAudio] = useState();
     let [screen, setScreen] = useState();
-    let [showModal, setModal] = useState(true);
+    let [showModal, setModal] = useState(false);
     let [screenAvailable, setScreenAvailable] = useState();
     let [messages, setMessages] = useState([])
     let [message, setMessage] = useState("");
@@ -647,7 +647,7 @@ useEffect(() => {
                     <h2 style={{ fontSize: "20px", color: "#1a1a2e", fontWeight: "600" }}>Enter your name to join</h2>
 
                     <div style={{ width: "320px", height: "200px", borderRadius: "12px", overflow: "hidden", border: "2px solid #e0e0ef", background: "#000" }}>
-                        <video ref={localVideoref} autoPlay muted style={{ width: "100%", height: "100%", objectFit: "cover" }}></video>
+<video ref={localVideoref} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }}></video>
                     </div>
 
                     {passwordError && (
@@ -966,7 +966,7 @@ useEffect(() => {
                     </div>
 
                     {/* Local video */}
-<video className={styles.meetUserVideo} ref={localVideoref} autoPlay muted></video>
+<video className={styles.meetUserVideo} ref={localVideoref} autoPlay muted playsInline></video>
 
 {/* ✅ Apna naam corner mein */}
 <div style={{
