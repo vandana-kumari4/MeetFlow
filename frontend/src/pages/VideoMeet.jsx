@@ -1016,18 +1016,26 @@ useEffect(() => {
             }}>
                 {video.username || "Guest"} {pinnedVideo === video.socketId ? "📌" : ""}
             </div>
-            <video data-socket={video.socketId}
-                ref={ref => {
-                    if (ref && video.stream && ref.srcObject !== video.stream) {
-                        ref.srcObject = video.stream;
-                        ref.play().catch(e => console.log("Remote play error:", e));
+          <video data-socket={video.socketId}
+    ref={ref => {
+        if (!ref) return;
+        if (video.stream && ref.srcObject !== video.stream) {
+            ref.srcObject = video.stream;
+            const playPromise = ref.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    if (e.name !== "AbortError") {
+                        console.log("Remote play error:", e);
                     }
-                }}
-                autoPlay
-                playsInline
-                muted={false}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}>
-            </video>
+                });
+            }
+        }
+    }}
+    autoPlay
+    playsInline
+    muted={false}
+    style={{ width: "100%", height: "100%", objectFit: "cover" }}>
+</video>
         </div>
     ))}
 </div>
