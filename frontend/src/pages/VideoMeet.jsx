@@ -240,7 +240,7 @@ let [connectionQuality, setConnectionQuality] = useState("good");
         socketRef.current.on('signal', gotMessageFromServer)
 
         socketRef.current.on('connect', () => {
-            socketRef.current.emit('join-call', window.location.href, password)
+socketRef.current.emit('join-call', window.location.href, password, username)
             socketIdRef.current = socketRef.current.id
             socketRef.current.on('chat-message', addMessage)
 
@@ -259,11 +259,10 @@ let [connectionQuality, setConnectionQuality] = useState("good");
                 setParticipantCount(prev => Math.max(1, prev - 1))
                 setRaisedHands(prev => prev.filter(h => h.socketId !== id))
             })
-
-            socketRef.current.on('user-joined', (id, clients) => {
-                setParticipantCount(clients.length)
-                clients.forEach((socketListId) => {
-                     if (connections[socketListId]) return;
+socketRef.current.on('user-joined', (id, clients, allUsernames) => {
+    setParticipantCount(clients.length)
+    clients.forEach((socketListId) => {
+        if (connections[socketListId]) return;
                     connections[socketListId] = new RTCPeerConnection(peerConfigConnections)
                     connections[socketListId].onicecandidate = function (event) {
                         if (event.candidate != null) {
@@ -280,9 +279,9 @@ let [connectionQuality, setConnectionQuality] = useState("good");
                                 videoRef.current = updatedVideos;
                                 return updatedVideos;
                             });
-                        } else {
-                            let newVideo = { socketId: socketListId, stream: event.stream, autoplay: true, playsinline: true };
-                            setVideos(videos => {
+} else {
+    let newVideo = { socketId: socketListId, stream: event.stream, autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
+    setVideos(videos => {
                                 const updatedVideos = [...videos, newVideo];
                                 videoRef.current = updatedVideos;
                                 return updatedVideos;
@@ -988,8 +987,16 @@ useEffect(() => {
 
                     {/* Remote videos */}
                     <div className={styles.conferenceView}>
-                      {videos.map((video) => (
-    <div key={video.socketId}>
+               {videos.map((video) => (
+    <div key={video.socketId} style={{ position: "relative" }}>
+        <div style={{
+            position: "absolute", bottom: "8px", left: "8px",
+            background: "rgba(0,0,0,0.6)", color: "#fff",
+            padding: "4px 10px", borderRadius: "8px",
+            fontSize: "12px", fontWeight: "600", zIndex: 5
+        }}>
+            {video.username || "Guest"}
+        </div>
         <video data-socket={video.socketId}
           ref={ref => {
     if (ref && video.stream && ref.srcObject !== video.stream) {

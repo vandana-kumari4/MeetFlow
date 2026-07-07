@@ -3,7 +3,8 @@ import { Server } from "socket.io"
 let connections = {}
 let messages = {}
 let timeOnline = {}
-let roomPasswords = {} // ✅ Room passwords store karne ke liye
+let roomPasswords = {}
+let usernames = {} // ✅ socketId -> username mapping
 
 export const connectToSocket = (server) => {
     const io = new Server(server, {
@@ -20,17 +21,14 @@ export const connectToSocket = (server) => {
         console.log("SOMETHING CONNECTED")
 
         // ✅ Password protected join
-        socket.on("join-call", (path, password) => {
+        socket.on("join-call", (path, password, username) => {
 
-            // Agar room already hai aur password set hai
             if (roomPasswords[path] !== undefined) {
-                // Password check karo
                 if (roomPasswords[path] !== password) {
                     socket.emit("wrong-password")
                     return;
                 }
             } else {
-                // Pehla banda join kar raha hai — password set karo
                 if (password && password.trim() !== "") {
                     roomPasswords[path] = password;
                 }
@@ -41,9 +39,10 @@ export const connectToSocket = (server) => {
             }
             connections[path].push(socket.id)
             timeOnline[socket.id] = new Date();
+            usernames[socket.id] = username || "Guest"; // ✅ username save karo
 
             for (let a = 0; a < connections[path].length; a++) {
-                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path])
+                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path], usernames)
             }
 
             if (messages[path] !== undefined) {
@@ -53,7 +52,6 @@ export const connectToSocket = (server) => {
                 }
             }
 
-            // ✅ Batao ki room mein password hai ya nahi
             socket.emit("room-has-password", roomPasswords[path] !== undefined)
         })
 
@@ -77,7 +75,6 @@ export const connectToSocket = (server) => {
             }
         })
 
-        // Raise Hand
         socket.on("raise-hand", (username, socketId) => {
             const [matchingRoom, found] = Object.entries(connections)
                 .reduce(([room, isFound], [roomKey, roomValue]) => {
@@ -91,7 +88,6 @@ export const connectToSocket = (server) => {
             }
         })
 
-        // Lower Hand
         socket.on("lower-hand", (socketId) => {
             const [matchingRoom, found] = Object.entries(connections)
                 .reduce(([room, isFound], [roomKey, roomValue]) => {
@@ -105,7 +101,6 @@ export const connectToSocket = (server) => {
             }
         })
 
-        // Emoji Reaction
         socket.on("emoji-reaction", (emoji, username) => {
             const [matchingRoom, found] = Object.entries(connections)
                 .reduce(([room, isFound], [roomKey, roomValue]) => {
@@ -130,7 +125,6 @@ export const connectToSocket = (server) => {
                         }
                         var index = connections[key].indexOf(socket.id)
                         connections[key].splice(index, 1)
-                        // ✅ Room empty ho gayi toh password bhi delete karo
                         if (connections[key].length === 0) {
                             delete connections[key]
                             delete roomPasswords[key]
@@ -138,6 +132,7 @@ export const connectToSocket = (server) => {
                     }
                 }
             }
+            delete usernames[socket.id] // ✅ cleanup
         })
     })
 
