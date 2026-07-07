@@ -263,6 +263,7 @@ let [connectionQuality, setConnectionQuality] = useState("good");
             socketRef.current.on('user-joined', (id, clients) => {
                 setParticipantCount(clients.length)
                 clients.forEach((socketListId) => {
+                     if (connections[socketListId]) return;
                     connections[socketListId] = new RTCPeerConnection(peerConfigConnections)
                     connections[socketListId].onicecandidate = function (event) {
                         if (event.candidate != null) {
