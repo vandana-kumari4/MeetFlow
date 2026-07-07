@@ -13,10 +13,10 @@
     justify-content: center;
 }
 
-/* ================= VIDEO GRID (Google Meet style) ================= */
 .conferenceView {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-auto-flow: dense;
     gap: 10px;
     width: 100%;
     height: 100%;
@@ -26,7 +26,6 @@
     justify-content: center;
     box-sizing: border-box;
 }
-
 .conferenceView > div {
     position: relative;
     background: #3c4043;

@@ -65,7 +65,7 @@ export default function VideoMeetComponent() {
     let [askForUsername, setAskForUsername] = useState(true);
     let [username, setUsername] = useState(localStorage.getItem("meetflow_username") || "");
     const videoRef = useRef([])
-    let [videos, setVideos] = useState([])
+    let [pinnedVideo, setPinnedVideo] = useState(null); // ✅ kaun sa video bada dikhega
     let [participantCount, setParticipantCount] = useState(1);
 let [connectionQuality, setConnectionQuality] = useState("good"); 
     let [callDuration, setCallDuration] = useState(0);
@@ -986,33 +986,46 @@ useEffect(() => {
                     )}
 
                     {/* Remote videos */}
-                    <div className={styles.conferenceView}>
-               {videos.map((video) => (
-    <div key={video.socketId} style={{ position: "relative" }}>
-        <div style={{
-            position: "absolute", bottom: "8px", left: "8px",
-            background: "rgba(0,0,0,0.6)", color: "#fff",
-            padding: "4px 10px", borderRadius: "8px",
-            fontSize: "12px", fontWeight: "600", zIndex: 5
-        }}>
-            {video.username || "Guest"}
+  {/* Remote videos */}
+<div className={styles.conferenceView}>
+    {videos.map((video) => (
+        <div
+            key={video.socketId}
+            onClick={() => setPinnedVideo(pinnedVideo === video.socketId ? null : video.socketId)}
+            style={{
+                position: "relative",
+                cursor: "pointer",
+                gridColumn: pinnedVideo === video.socketId ? "1 / -1" : "auto",
+                order: pinnedVideo === video.socketId ? -1 : 0,
+                maxHeight: pinnedVideo === video.socketId ? "80vh" : undefined,
+                transition: "all 0.25s ease"
+            }}
+        >
+            <div style={{
+                position: "absolute", bottom: "8px", left: "8px",
+                background: "rgba(0,0,0,0.6)", color: "#fff",
+                padding: "4px 10px", borderRadius: "8px",
+                fontSize: "12px", fontWeight: "600", zIndex: 5
+            }}>
+                {video.username || "Guest"}
+            </div>
+            <video data-socket={video.socketId}
+                ref={ref => {
+                    if (ref && video.stream && ref.srcObject !== video.stream) {
+                        ref.srcObject = video.stream;
+                        ref.play().catch(e => console.log("Remote play error:", e));
+                    }
+                }}
+                autoPlay
+                playsInline
+                muted={false}>
+            </video>
         </div>
-        <video data-socket={video.socketId}
-          ref={ref => {
-    if (ref && video.stream && ref.srcObject !== video.stream) {
-        ref.srcObject = video.stream;
-        ref.play().catch(e => console.log("Remote play error:", e));
-    }
-}} 
-            autoPlay
-            playsInline
-            muted={false}>
-        </video>
-    </div>
-))}
+    ))}
+</div>
                     </div>
 
-                </div>
+            
             }
         </div>
     )
