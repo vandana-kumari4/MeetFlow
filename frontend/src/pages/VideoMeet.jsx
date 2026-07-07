@@ -986,7 +986,8 @@ useEffect(() => {
                     )}
 
                     {/* Remote videos */}
-  {/* Remote videos */}
+  
+{/* Remote videos */}
 <div className={styles.conferenceView}>
     {videos.map((video) => (
         <div
@@ -997,8 +998,14 @@ useEffect(() => {
                 cursor: "pointer",
                 gridColumn: pinnedVideo === video.socketId ? "1 / -1" : "auto",
                 order: pinnedVideo === video.socketId ? -1 : 0,
-                maxHeight: pinnedVideo === video.socketId ? "80vh" : undefined,
-                transition: "all 0.25s ease"
+                width: pinnedVideo === video.socketId ? "min(90vw, 900px)" : undefined,
+                height: pinnedVideo === video.socketId ? "min(75vh, 600px)" : undefined,
+                margin: pinnedVideo === video.socketId ? "0 auto" : undefined,
+                border: pinnedVideo === video.socketId ? "3px solid #534AB7" : "3px solid transparent",
+                borderRadius: "12px",
+                boxShadow: pinnedVideo === video.socketId ? "0 8px 30px rgba(83,74,183,0.5)" : "none",
+                transition: "all 0.25s ease",
+                overflow: "hidden"
             }}
         >
             <div style={{
@@ -1007,7 +1014,7 @@ useEffect(() => {
                 padding: "4px 10px", borderRadius: "8px",
                 fontSize: "12px", fontWeight: "600", zIndex: 5
             }}>
-                {video.username || "Guest"}
+                {video.username || "Guest"} {pinnedVideo === video.socketId ? "📌" : ""}
             </div>
             <video data-socket={video.socketId}
                 ref={ref => {
@@ -1018,15 +1025,16 @@ useEffect(() => {
                 }}
                 autoPlay
                 playsInline
-                muted={false}>
+                muted={false}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}>
             </video>
         </div>
     ))}
 </div>
-                    </div>
-
             
-            }
+            
         </div>
+}
+</div>
     )
 }
