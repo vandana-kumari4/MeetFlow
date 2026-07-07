@@ -990,12 +990,12 @@ useEffect(() => {
                       {videos.map((video) => (
     <div key={video.socketId}>
         <video data-socket={video.socketId}
-            ref={ref => {
-                if (ref && video.stream) {
-                    ref.srcObject = video.stream;
-                    ref.play().catch(e => console.log("Remote play error:", e));
-                }
-            }}
+          ref={ref => {
+    if (ref && video.stream && ref.srcObject !== video.stream) {
+        ref.srcObject = video.stream;
+        ref.play().catch(e => console.log("Remote play error:", e));
+    }
+}} 
             autoPlay
             playsInline
             muted={false}>
