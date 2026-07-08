@@ -143,14 +143,14 @@ let [connectionQuality, setConnectionQuality] = useState("good");
         connectToSocketServer(roomPassword);
     }
 
-    let getUserMediaSuccess = (stream) => {
+   let getUserMediaSuccess = (stream) => {
         try { window.localStream.getTracks().forEach(track => track.stop()) } catch (e) { console.log(e) }
         window.localStream = stream
         localVideoref.current.srcObject = stream
 
         for (let id in connections) {
             if (id === socketIdRef.current) continue
-            connections[id].addStream(window.localStream)
+            window.localStream.getTracks().forEach(track => connections[id].addTrack(track, window.localStream))
             connections[id].createOffer().then((description) => {
                 connections[id].setLocalDescription(description)
                     .then(() => { socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connections[id].localDescription })) })
@@ -184,13 +184,13 @@ let [connectionQuality, setConnectionQuality] = useState("good");
         }
     }
 
-    let getDislayMediaSuccess = (stream) => {
+   let getDislayMediaSuccess = (stream) => {
         try { window.localStream.getTracks().forEach(track => track.stop()) } catch (e) { console.log(e) }
         window.localStream = stream
         localVideoref.current.srcObject = stream
         for (let id in connections) {
             if (id === socketIdRef.current) continue
-            connections[id].addStream(window.localStream)
+            window.localStream.getTracks().forEach(track => connections[id].addTrack(track, window.localStream))
             connections[id].createOffer().then((description) => {
                 connections[id].setLocalDescription(description)
                     .then(() => { socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connections[id].localDescription })) })
@@ -269,37 +269,39 @@ socketRef.current.on('user-joined', (id, clients, allUsernames) => {
                             socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }))
                         }
                     }
-                    connections[socketListId].onaddstream = (event) => {
-                        let videoExists = videoRef.current.find(video => video.socketId === socketListId);
-                        if (videoExists) {
-                            setVideos(videos => {
-                                const updatedVideos = videos.map(video =>
-                                    video.socketId === socketListId ? { ...video, stream: event.stream } : video
-                                );
-                                videoRef.current = updatedVideos;
-                                return updatedVideos;
-                            });
+     connections[socketListId].ontrack = (event) => {
+    let videoExists = videoRef.current.find(video => video.socketId === socketListId);
+    if (videoExists) {
+        setVideos(videos => {
+            const updatedVideos = videos.map(video =>
+                video.socketId === socketListId ? { ...video, stream: event.streams[0] } : video
+            );
+            videoRef.current = updatedVideos;
+            return updatedVideos;
+        });
+    } else {
+        let newVideo = { socketId: socketListId, stream: event.streams[0], autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
+        setVideos(videos => {
+            const updatedVideos = [...videos, newVideo];
+            videoRef.current = updatedVideos;
+            return updatedVideos;
+        });
+    }
+};
+                 if (window.localStream !== undefined && window.localStream !== null) {
+    window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
 } else {
-    let newVideo = { socketId: socketListId, stream: event.stream, autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
-    setVideos(videos => {
-                                const updatedVideos = [...videos, newVideo];
-                                videoRef.current = updatedVideos;
-                                return updatedVideos;
-                            });
-                        }
-                    };
-                    if (window.localStream !== undefined && window.localStream !== null) {
-                        connections[socketListId].addStream(window.localStream)
-                    } else {
-                        let blackSilence = (...args) => new MediaStream([black(...args), silence()])
-                        window.localStream = blackSilence()
-                        connections[socketListId].addStream(window.localStream)
-                    }
-                })
+    let blackSilence = (...args) => new MediaStream([black(...args), silence()])
+    window.localStream = blackSilence()
+    window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
+}
+            })
                 if (id === socketIdRef.current) {
                     for (let id2 in connections) {
                         if (id2 === socketIdRef.current) continue
-                        try { connections[id2].addStream(window.localStream) } catch (e) { }
+                        try {
+                            window.localStream.getTracks().forEach(track => connections[id2].addTrack(track, window.localStream))
+                        } catch (e) { }
                         connections[id2].createOffer().then((description) => {
                             connections[id2].setLocalDescription(description)
                                 .then(() => { socketRef.current.emit('signal', id2, JSON.stringify({ 'sdp': connections[id2].localDescription })) })
