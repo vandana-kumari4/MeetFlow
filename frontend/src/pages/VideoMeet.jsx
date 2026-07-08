@@ -29,11 +29,16 @@ let peerConfigConnections = {
 }
 
 const fetchTurnCredentials = async () => {
+    console.log("Fetching TURN credentials from:", `${server}/api/v1/turn-credentials`);
     try {
         const response = await fetch(`${server}/api/v1/turn-credentials`);
         const iceServers = await response.json();
+        console.log("TURN credentials response:", iceServers);
         if (Array.isArray(iceServers)) {
             peerConfigConnections = { "iceServers": iceServers };
+            console.log("peerConfigConnections updated:", peerConfigConnections);
+        } else {
+            console.log("TURN response was not an array, keeping STUN only");
         }
     } catch (e) {
         console.log("Failed to fetch TURN credentials, using STUN only:", e);
@@ -60,9 +65,10 @@ export default function VideoMeetComponent() {
     let [askForUsername, setAskForUsername] = useState(true);
     let [username, setUsername] = useState(localStorage.getItem("meetflow_username") || "");
     const videoRef = useRef([])
+    let [videos, setVideos] = useState([])
     let [pinnedVideo, setPinnedVideo] = useState(null); // ✅ kaun sa video bada dikhega
     let [participantCount, setParticipantCount] = useState(1);
-let [connectionQuality, setConnectionQuality] = useState("good"); 
+    let [connectionQuality, setConnectionQuality] = useState("good");
     let [callDuration, setCallDuration] = useState(0);
     let timerRef = useRef(null);
 
@@ -96,10 +102,10 @@ let [connectionQuality, setConnectionQuality] = useState("good");
     let [currentCaption, setCurrentCaption] = useState("");
     let recognitionRef = useRef(null);
 
-useEffect(() => {
-    fetchTurnCredentials();
-    getPermissions();
-},[])
+    useEffect(() => {
+        fetchTurnCredentials();
+        getPermissions();
+    }, [])
 
     let getDislayMedia = () => {
         if (screen) {
@@ -139,7 +145,7 @@ useEffect(() => {
         connectToSocketServer(roomPassword);
     }
 
-   let getUserMediaSuccess = (stream) => {
+    let getUserMediaSuccess = (stream) => {
         try { window.localStream.getTracks().forEach(track => track.stop()) } catch (e) { console.log(e) }
         window.localStream = stream
         localVideoref.current.srcObject = stream
@@ -161,7 +167,7 @@ useEffect(() => {
             window.localStream = blackSilence()
             localVideoref.current.srcObject = window.localStream
             for (let id in connections) {
-                connections[id].addStream(window.localStream)
+                window.localStream.getTracks().forEach(track => connections[id].addTrack(track, window.localStream))
                 connections[id].createOffer().then((description) => {
                     connections[id].setLocalDescription(description)
                         .then(() => { socketRef.current.emit('signal', id, JSON.stringify({ 'sdp': connections[id].localDescription })) })
@@ -180,7 +186,7 @@ useEffect(() => {
         }
     }
 
-   let getDislayMediaSuccess = (stream) => {
+    let getDislayMediaSuccess = (stream) => {
         try { window.localStream.getTracks().forEach(track => track.stop()) } catch (e) { console.log(e) }
         window.localStream = stream
         localVideoref.current.srcObject = stream
@@ -203,40 +209,40 @@ useEffect(() => {
         })
     }
     let gotMessageFromServer = (fromId, message) => {
-    var signal = JSON.parse(message)
+        var signal = JSON.parse(message)
 
-    // ✅ Connection exist karta hai ya nahi check karo
-    if (!connections[fromId]) {
-        console.log("Connection not ready yet for:", fromId);
-        return;
-    }
+        // ✅ Connection exist karta hai ya nahi check karo
+        if (!connections[fromId]) {
+            console.log("Connection not ready yet for:", fromId);
+            return;
+        }
 
-    if (fromId !== socketIdRef.current) {
-        if (signal.sdp) {
-            connections[fromId].setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
-                if (signal.sdp.type === 'offer') {
-                    connections[fromId].createAnswer().then((description) => {
-                        connections[fromId].setLocalDescription(description).then(() => {
-                            socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': connections[fromId].localDescription }))
+        if (fromId !== socketIdRef.current) {
+            if (signal.sdp) {
+                connections[fromId].setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(() => {
+                    if (signal.sdp.type === 'offer') {
+                        connections[fromId].createAnswer().then((description) => {
+                            connections[fromId].setLocalDescription(description).then(() => {
+                                socketRef.current.emit('signal', fromId, JSON.stringify({ 'sdp': connections[fromId].localDescription }))
+                            }).catch(e => console.log(e))
                         }).catch(e => console.log(e))
-                    }).catch(e => console.log(e))
-                }
-            }).catch(e => console.log(e))
-        }
-        if (signal.ice) {
-            connections[fromId].addIceCandidate(new RTCIceCandidate(signal.ice)).catch(e => console.log(e))
+                    }
+                }).catch(e => console.log(e))
+            }
+            if (signal.ice) {
+                connections[fromId].addIceCandidate(new RTCIceCandidate(signal.ice)).catch(e => console.log(e))
+            }
         }
     }
-}
 
-   
+
 
     let connectToSocketServer = (password = "") => {
         socketRef.current = io.connect(server_url, { secure: false })
         socketRef.current.on('signal', gotMessageFromServer)
 
         socketRef.current.on('connect', () => {
-socketRef.current.emit('join-call', window.location.href, password, username)
+            socketRef.current.emit('join-call', window.location.href, password, username)
             socketIdRef.current = socketRef.current.id
             socketRef.current.on('chat-message', addMessage)
 
@@ -255,43 +261,44 @@ socketRef.current.emit('join-call', window.location.href, password, username)
                 setParticipantCount(prev => Math.max(1, prev - 1))
                 setRaisedHands(prev => prev.filter(h => h.socketId !== id))
             })
-socketRef.current.on('user-joined', (id, clients, allUsernames) => {
-    setParticipantCount(clients.length)
-    clients.forEach((socketListId) => {
-        if (connections[socketListId]) return;
+
+            socketRef.current.on('user-joined', (id, clients, allUsernames) => {
+                setParticipantCount(clients.length)
+                clients.forEach((socketListId) => {
+                    if (connections[socketListId]) return;
                     connections[socketListId] = new RTCPeerConnection(peerConfigConnections)
                     connections[socketListId].onicecandidate = function (event) {
                         if (event.candidate != null) {
                             socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }))
                         }
                     }
-     connections[socketListId].ontrack = (event) => {
-    let videoExists = videoRef.current.find(video => video.socketId === socketListId);
-    if (videoExists) {
-        setVideos(videos => {
-            const updatedVideos = videos.map(video =>
-                video.socketId === socketListId ? { ...video, stream: event.streams[0] } : video
-            );
-            videoRef.current = updatedVideos;
-            return updatedVideos;
-        });
-    } else {
-        let newVideo = { socketId: socketListId, stream: event.streams[0], autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
-        setVideos(videos => {
-            const updatedVideos = [...videos, newVideo];
-            videoRef.current = updatedVideos;
-            return updatedVideos;
-        });
-    }
-};
-                 if (window.localStream !== undefined && window.localStream !== null) {
-    window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
-} else {
-    let blackSilence = (...args) => new MediaStream([black(...args), silence()])
-    window.localStream = blackSilence()
-    window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
-}
-            })
+                    connections[socketListId].ontrack = (event) => {
+                        let videoExists = videoRef.current.find(video => video.socketId === socketListId);
+                        if (videoExists) {
+                            setVideos(videos => {
+                                const updatedVideos = videos.map(video =>
+                                    video.socketId === socketListId ? { ...video, stream: event.streams[0] } : video
+                                );
+                                videoRef.current = updatedVideos;
+                                return updatedVideos;
+                            });
+                        } else {
+                            let newVideo = { socketId: socketListId, stream: event.streams[0], autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
+                            setVideos(videos => {
+                                const updatedVideos = [...videos, newVideo];
+                                videoRef.current = updatedVideos;
+                                return updatedVideos;
+                            });
+                        }
+                    };
+                    if (window.localStream !== undefined && window.localStream !== null) {
+                        window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
+                    } else {
+                        let blackSilence = (...args) => new MediaStream([black(...args), silence()])
+                        window.localStream = blackSilence()
+                        window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
+                    }
+                })
                 if (id === socketIdRef.current) {
                     for (let id2 in connections) {
                         if (id2 === socketIdRef.current) continue
@@ -364,32 +371,32 @@ socketRef.current.on('user-joined', (id, clients, allUsernames) => {
         return `${m}:${s}`;
     }
     let checkConnectionQuality = () => {
-    if (!navigator.onLine) {
-        setConnectionQuality("poor");
-        return;
+        if (!navigator.onLine) {
+            setConnectionQuality("poor");
+            return;
+        }
+        // Simple check based on navigator connection API
+        if (navigator.connection) {
+            const effectiveType = navigator.connection.effectiveType;
+            if (effectiveType === "4g") setConnectionQuality("good");
+            else if (effectiveType === "3g") setConnectionQuality("medium");
+            else setConnectionQuality("poor");
+        } else {
+            setConnectionQuality("good"); // default agar API support nahi
+        }
     }
-    // Simple check based on navigator connection API
-    if (navigator.connection) {
-        const effectiveType = navigator.connection.effectiveType;
-        if (effectiveType === "4g") setConnectionQuality("good");
-        else if (effectiveType === "3g") setConnectionQuality("medium");
-        else setConnectionQuality("poor");
-    } else {
-        setConnectionQuality("good"); // default agar API support nahi
-    }
-}
 
-useEffect(() => {
-    checkConnectionQuality();
-    const interval = setInterval(checkConnectionQuality, 5000);
-    window.addEventListener('online', checkConnectionQuality);
-    window.addEventListener('offline', checkConnectionQuality);
-    return () => {
-        clearInterval(interval);
-        window.removeEventListener('online', checkConnectionQuality);
-        window.removeEventListener('offline', checkConnectionQuality);
-    }
-}, [])
+    useEffect(() => {
+        checkConnectionQuality();
+        const interval = setInterval(checkConnectionQuality, 5000);
+        window.addEventListener('online', checkConnectionQuality);
+        window.addEventListener('offline', checkConnectionQuality);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('online', checkConnectionQuality);
+            window.removeEventListener('offline', checkConnectionQuality);
+        }
+    }, [])
 
     let handleRaiseHand = () => {
         if (!handRaised) {
@@ -446,10 +453,10 @@ useEffect(() => {
         }
     }
     let handleBlurToggle = () => {
-    alert("🌫️ Background blur feature is temporarily under maintenance. Coming soon!");
-}
+        alert("🌫️ Background blur feature is temporarily under maintenance. Coming soon!");
+    }
 
-   
+
     let startRecording = () => {
         try {
             recordedChunksRef.current = [];
@@ -615,13 +622,13 @@ useEffect(() => {
         setMessage("");
     }
 
-   let connect = () => {
-    localStorage.setItem("meetflow_username", username); 
-    setPasswordError("")
-    setAskForUsername(false);
-    getMedia();
-    startTimer();
-}
+    let connect = () => {
+        localStorage.setItem("meetflow_username", username);
+        setPasswordError("")
+        setAskForUsername(false);
+        getMedia();
+        startTimer();
+    }
 
     return (
         <div>
@@ -645,7 +652,7 @@ useEffect(() => {
                     <h2 style={{ fontSize: "20px", color: "#1a1a2e", fontWeight: "600" }}>Enter your name to join</h2>
 
                     <div style={{ width: "320px", height: "200px", borderRadius: "12px", overflow: "hidden", border: "2px solid #e0e0ef", background: "#000" }}>
-<video ref={localVideoref} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }}></video>
+                        <video ref={localVideoref} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }}></video>
                     </div>
 
                     {passwordError && (
@@ -678,17 +685,17 @@ useEffect(() => {
                                 "& .MuiInputLabel-root.Mui-focused": { color: "#534AB7" }
                             }}
                         />
-                       <p
-  style={{
-    fontSize: "12px",
-    color: "#6B7280",
-    marginTop: "8px",
-    textAlign: "center",
-    lineHeight: "1.5",
-  }}
->
-  Use a password if your meeting is private or access is restricted.
-</p>
+                        <p
+                            style={{
+                                fontSize: "12px",
+                                color: "#6B7280",
+                                marginTop: "8px",
+                                textAlign: "center",
+                                lineHeight: "1.5",
+                            }}
+                        >
+                            Use a password if your meeting is private or access is restricted.
+                        </p>
                     </div>
 
                     <Button variant="contained" onClick={connect}
@@ -731,18 +738,18 @@ useEffect(() => {
                                 </div>
                             )}
                             {/* ✅ Connection Quality */}
-<div style={{
-    display: "flex", alignItems: "center", gap: "4px",
-    background: "rgba(0,0,0,0.4)", padding: "6px 10px",
-    borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)"
-}}>
-    <span style={{ fontSize: "14px" }}>
-        {connectionQuality === "good" ? "🟢" : connectionQuality === "medium" ? "🟡" : "🔴"}
-    </span>
-    <span style={{ color: "#fff", fontSize: "11px", fontWeight: "600" }}>
-        {connectionQuality === "good" ? "Good" : connectionQuality === "medium" ? "Fair" : "Poor"}
-    </span>
-</div>
+                            <div style={{
+                                display: "flex", alignItems: "center", gap: "4px",
+                                background: "rgba(0,0,0,0.4)", padding: "6px 10px",
+                                borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)"
+                            }}>
+                                <span style={{ fontSize: "14px" }}>
+                                    {connectionQuality === "good" ? "🟢" : connectionQuality === "medium" ? "🟡" : "🔴"}
+                                </span>
+                                <span style={{ color: "#fff", fontSize: "11px", fontWeight: "600" }}>
+                                    {connectionQuality === "good" ? "Good" : connectionQuality === "medium" ? "Fair" : "Poor"}
+                                </span>
+                            </div>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(83,74,183,0.8)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.2)" }}>
                                 <PeopleIcon style={{ color: "#fff", fontSize: "18px" }} />
                                 <span style={{ color: "#fff", fontSize: "14px", fontWeight: "600" }}>
@@ -964,17 +971,17 @@ useEffect(() => {
                     </div>
 
                     {/* Local video */}
-<video className={styles.meetUserVideo} ref={localVideoref} autoPlay muted playsInline></video>
+                    <video className={styles.meetUserVideo} ref={localVideoref} autoPlay muted playsInline></video>
 
-{/* ✅ Apna naam corner mein */}
-<div style={{
-    position: "absolute", bottom: "10px", left: "10px",
-    background: "rgba(0,0,0,0.6)", color: "#fff",
-    padding: "4px 10px", borderRadius: "8px",
-    fontSize: "12px", fontWeight: "600", zIndex: 5
-}}>
-    {username} (You)
-</div>
+                    {/* ✅ Apna naam corner mein */}
+                    <div style={{
+                        position: "absolute", bottom: "10px", left: "10px",
+                        background: "rgba(0,0,0,0.6)", color: "#fff",
+                        padding: "4px 10px", borderRadius: "8px",
+                        fontSize: "12px", fontWeight: "600", zIndex: 5
+                    }}>
+                        {username} (You)
+                    </div>
 
                     {/* Blur canvas */}
                     {blurBackground && (
@@ -984,63 +991,60 @@ useEffect(() => {
                     )}
 
                     {/* Remote videos */}
-  
-{/* Remote videos */}
-<div className={styles.conferenceView}>
-    {videos.map((video) => (
-        <div
-            key={video.socketId}
-            onClick={() => setPinnedVideo(pinnedVideo === video.socketId ? null : video.socketId)}
-            style={{
-                position: "relative",
-                cursor: "pointer",
-                gridColumn: pinnedVideo === video.socketId ? "1 / -1" : "auto",
-                order: pinnedVideo === video.socketId ? -1 : 0,
-                width: pinnedVideo === video.socketId ? "min(90vw, 900px)" : undefined,
-                height: pinnedVideo === video.socketId ? "min(75vh, 600px)" : undefined,
-                margin: pinnedVideo === video.socketId ? "0 auto" : undefined,
-                border: pinnedVideo === video.socketId ? "3px solid #534AB7" : "3px solid transparent",
-                borderRadius: "12px",
-                boxShadow: pinnedVideo === video.socketId ? "0 8px 30px rgba(83,74,183,0.5)" : "none",
-                transition: "all 0.25s ease",
-                overflow: "hidden"
-            }}
-        >
-            <div style={{
-                position: "absolute", bottom: "8px", left: "8px",
-                background: "rgba(0,0,0,0.6)", color: "#fff",
-                padding: "4px 10px", borderRadius: "8px",
-                fontSize: "12px", fontWeight: "600", zIndex: 5
-            }}>
-                {video.username || "Guest"} {pinnedVideo === video.socketId ? "📌" : ""}
-            </div>
-          <video data-socket={video.socketId}
-    ref={ref => {
-        if (!ref) return;
-        if (video.stream && ref.srcObject !== video.stream) {
-            ref.srcObject = video.stream;
-            const playPromise = ref.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(e => {
-                    if (e.name !== "AbortError") {
-                        console.log("Remote play error:", e);
-                    }
-                });
+                    <div className={styles.conferenceView}>
+                        {videos.map((video) => (
+                            <div
+                                key={video.socketId}
+                                onClick={() => setPinnedVideo(pinnedVideo === video.socketId ? null : video.socketId)}
+                                style={{
+                                    position: "relative",
+                                    cursor: "pointer",
+                                    gridColumn: pinnedVideo === video.socketId ? "1 / -1" : "auto",
+                                    order: pinnedVideo === video.socketId ? -1 : 0,
+                                    width: pinnedVideo === video.socketId ? "min(90vw, 900px)" : undefined,
+                                    height: pinnedVideo === video.socketId ? "min(75vh, 600px)" : undefined,
+                                    margin: pinnedVideo === video.socketId ? "0 auto" : undefined,
+                                    border: pinnedVideo === video.socketId ? "3px solid #534AB7" : "3px solid transparent",
+                                    borderRadius: "12px",
+                                    boxShadow: pinnedVideo === video.socketId ? "0 8px 30px rgba(83,74,183,0.5)" : "none",
+                                    transition: "all 0.25s ease",
+                                    overflow: "hidden"
+                                }}
+                            >
+                                <div style={{
+                                    position: "absolute", bottom: "8px", left: "8px",
+                                    background: "rgba(0,0,0,0.6)", color: "#fff",
+                                    padding: "4px 10px", borderRadius: "8px",
+                                    fontSize: "12px", fontWeight: "600", zIndex: 5
+                                }}>
+                                    {video.username || "Guest"} {pinnedVideo === video.socketId ? "📌" : ""}
+                                </div>
+                                <video data-socket={video.socketId}
+                                    ref={ref => {
+                                        if (!ref) return;
+                                        if (video.stream && ref.srcObject !== video.stream) {
+                                            ref.srcObject = video.stream;
+                                            const playPromise = ref.play();
+                                            if (playPromise !== undefined) {
+                                                playPromise.catch(e => {
+                                                    if (e.name !== "AbortError") {
+                                                        console.log("Remote play error:", e);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }}
+                                    autoPlay
+                                    playsInline
+                                    muted={false}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}>
+                                </video>
+                            </div>
+                        ))}
+                    </div>
+
+                </div>
             }
-        }
-    }}
-    autoPlay
-    playsInline
-    muted={false}
-    style={{ width: "100%", height: "100%", objectFit: "cover" }}>
-</video>
         </div>
-    ))}
-</div>
-            
-            
-        </div>
-}
-</div>
     )
 }
