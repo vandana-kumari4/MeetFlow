@@ -23,27 +23,22 @@ import * as tf from '@tensorflow/tfjs';
 
 const server_url = server;
 var connections = {};
-const peerConfigConnections = {
-    "iceServers": [
-        { "urls": "stun:stun.l.google.com:19302" },
-        {
-            "urls": "turn:openrelay.metered.ca:80",
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
-        },
-        {
-            "urls": "turn:openrelay.metered.ca:443",
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
-        },
-        {
-            "urls": "turn:openrelay.metered.ca:443?transport=tcp",
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
-        }
-    ]
+
+let peerConfigConnections = {
+    "iceServers": [{ "urls": "stun:stun.l.google.com:19302" }]
 }
 
+const fetchTurnCredentials = async () => {
+    try {
+        const response = await fetch(`${server}/api/v1/turn-credentials`);
+        const iceServers = await response.json();
+        if (Array.isArray(iceServers)) {
+            peerConfigConnections = { "iceServers": iceServers };
+        }
+    } catch (e) {
+        console.log("Failed to fetch TURN credentials, using STUN only:", e);
+    }
+}
 const EMOJIS = ["👍", "❤️", "😂", "😮", "👏", "🔥"]
 
 export default function VideoMeetComponent() {
@@ -101,9 +96,10 @@ let [connectionQuality, setConnectionQuality] = useState("good");
     let [currentCaption, setCurrentCaption] = useState("");
     let recognitionRef = useRef(null);
 
-    useEffect(() => {
-        getPermissions();
-    },[])
+useEffect(() => {
+    fetchTurnCredentials();
+    getPermissions();
+},[])
 
     let getDislayMedia = () => {
         if (screen) {
