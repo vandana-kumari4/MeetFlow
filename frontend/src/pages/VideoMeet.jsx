@@ -66,6 +66,7 @@ export default function VideoMeetComponent() {
     let [username, setUsername] = useState(localStorage.getItem("meetflow_username") || "");
     const videoRef = useRef([])
     let [videos, setVideos] = useState([])
+    let hasConnectedRef = useRef(false);
     let [pinnedVideo, setPinnedVideo] = useState(null); // ✅ kaun sa video bada dikhega
     let [participantCount, setParticipantCount] = useState(1);
     let [connectionQuality, setConnectionQuality] = useState("good");
@@ -139,12 +140,14 @@ export default function VideoMeetComponent() {
         if (video !== undefined && audio !== undefined) { getUserMedia(); }
     }, [video, audio])
 
-    let getMedia = () => {
-        setVideo(videoAvailable);
-        setAudio(audioAvailable);
+ let getMedia = () => {
+    setVideo(videoAvailable);
+    setAudio(audioAvailable);
+    if (!hasConnectedRef.current) {
+        hasConnectedRef.current = true;
         connectToSocketServer(roomPassword);
     }
-
+}
     let getUserMediaSuccess = (stream) => {
         try { window.localStream.getTracks().forEach(track => track.stop()) } catch (e) { console.log(e) }
         window.localStream = stream
