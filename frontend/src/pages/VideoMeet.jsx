@@ -23,26 +23,30 @@ import * as tf from '@tensorflow/tfjs';
 
 const server_url = server;
 var connections = {};
-
-let peerConfigConnections = {
-    "iceServers": [{ "urls": "stun:stun.l.google.com:19302" }]
-}
-
-const fetchTurnCredentials = async () => {
-    console.log("Fetching TURN credentials from:", `${server}/api/v1/turn-credentials`);
-    try {
-        const response = await fetch(`${server}/api/v1/turn-credentials`);
-        const iceServers = await response.json();
-        console.log("TURN credentials response:", iceServers);
-        if (Array.isArray(iceServers)) {
-            peerConfigConnections = { "iceServers": iceServers };
-            console.log("peerConfigConnections updated:", peerConfigConnections);
-        } else {
-            console.log("TURN response was not an array, keeping STUN only");
+const peerConfigConnections = {
+    "iceServers": [
+        { "urls": "stun:stun.relay.metered.ca:80" },
+        {
+            "urls": "turn:global.relay.metered.ca:80",
+            "username": "aa3afbb138f449e0881d26bd",
+            "credential": "uCCHZYtT9VOeqr3/"
+        },
+        {
+            "urls": "turn:global.relay.metered.ca:80?transport=tcp",
+            "username": "aa3afbb138f449e0881d26bd",
+            "credential": "uCCHZYtT9VOeqr3/"
+        },
+        {
+            "urls": "turn:global.relay.metered.ca:443",
+            "username": "aa3afbb138f449e0881d26bd",
+            "credential": "uCCHZYtT9VOeqr3/"
+        },
+        {
+            "urls": "turns:global.relay.metered.ca:443?transport=tcp",
+            "username": "aa3afbb138f449e0881d26bd",
+            "credential": "uCCHZYtT9VOeqr3/"
         }
-    } catch (e) {
-        console.log("Failed to fetch TURN credentials, using STUN only:", e);
-    }
+    ]
 }
 const EMOJIS = ["👍", "❤️", "😂", "😮", "👏", "🔥"]
 
@@ -103,10 +107,9 @@ export default function VideoMeetComponent() {
     let [currentCaption, setCurrentCaption] = useState("");
     let recognitionRef = useRef(null);
 
-    useEffect(() => {
-        fetchTurnCredentials();
-        getPermissions();
-    }, [])
+   useEffect(() => {
+    getPermissions();
+}, [])
 
     let getDislayMedia = () => {
         if (screen) {
