@@ -278,25 +278,22 @@ export default function VideoMeetComponent() {
                             socketRef.current.emit('signal', socketListId, JSON.stringify({ 'ice': event.candidate }))
                         }
                     }
-                    connections[socketListId].ontrack = (event) => {
-                        let videoExists = videoRef.current.find(video => video.socketId === socketListId);
-                        if (videoExists) {
-                            setVideos(videos => {
-                                const updatedVideos = videos.map(video =>
-                                    video.socketId === socketListId ? { ...video, stream: event.streams[0] } : video
-                                );
-                                videoRef.current = updatedVideos;
-                                return updatedVideos;
-                            });
-                        } else {
-                            let newVideo = { socketId: socketListId, stream: event.streams[0], autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
-                            setVideos(videos => {
-                                const updatedVideos = [...videos, newVideo];
-                                videoRef.current = updatedVideos;
-                                return updatedVideos;
-                            });
-                        }
-                    };
+                  connections[socketListId].ontrack = (event) => {
+    setVideos(videos => {
+        let videoExists = videos.find(video => video.socketId === socketListId);
+        let updatedVideos;
+        if (videoExists) {
+            updatedVideos = videos.map(video =>
+                video.socketId === socketListId ? { ...video, stream: event.streams[0] } : video
+            );
+        } else {
+            let newVideo = { socketId: socketListId, stream: event.streams[0], autoplay: true, playsinline: true, username: allUsernames ? allUsernames[socketListId] : "Guest" };
+            updatedVideos = [...videos, newVideo];
+        }
+        videoRef.current = updatedVideos;
+        return updatedVideos;
+    });
+};
                     if (window.localStream !== undefined && window.localStream !== null) {
                         window.localStream.getTracks().forEach(track => connections[socketListId].addTrack(track, window.localStream))
                     } else {
